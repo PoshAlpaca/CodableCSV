@@ -145,3 +145,100 @@ extension DialectDetectorTests {
 		}
 	}
 }
+
+// MARK: - Tests for detectType
+
+extension DialectDetectorTests {
+	func test_detectType() {
+		let examples: [(String, DialectDetector.FieldType?)] = [
+			("01/04/1999", .date),
+			("01.04.1999", .date),
+			("April 1st, 1999", .date),
+			("1st of April, 1999", .date),
+			("", .empty),
+			("1234", .number),
+			("1234.67", .number),
+			("NaN", .number),
+			("N/A", .notAvailable),
+			("example.com", .url),
+			("www.example.com", .url),
+			("https://example.com", .url),
+			("hello@example.com", .url),
+			("a70df58b-e564-4935-973a-318d21551507", .uuid),
+		].flatMap {
+			// generate cases where the data doesn't make up the entire field
+			[($0, $1), ("x \($0)", nil), ("\($0) x", nil)]
+		}
+
+		for (string, expectedFieldType) in examples {
+			let fieldType = DialectDetector.detectType(of: string)
+			XCTAssertEqual(fieldType, expectedFieldType, string)
+		}
+	}
+}
+
+// MARK: - Tests for isHeaderPresent
+
+extension DialectDetectorTests {
+	private typealias CSVAbstraction = [[DialectDetector.FieldType?]]
+	func test_isHeaderPresent() {
+		let examples: [(String, CSVAbstraction, Bool?)] = [
+			(
+				"No rows: There can't be a header row!",
+				[],
+				false
+			),
+			(
+				"One row, no detected types: Could be a header row but we don't know...",
+				[[nil, nil, nil]],
+				nil
+			),
+			(
+				"Multiple rows, no detected types: Could be a header row and two data rows but we don't know...",
+				[
+					[nil, nil, nil],
+					[nil, nil, nil],
+					[nil, nil, nil],
+				],
+				nil
+			),
+			(
+				"One row, different data types: Must be data!",
+				[[.uuid, nil, .url]],
+				false
+			),
+			(
+				"Multiple rows, different data types: Must be data!",
+				[
+					[.number, nil, nil],
+					[.number, nil, nil],
+					[.number, nil, nil],
+				],
+				false
+			),
+			(
+				"Multiple rows, first has no detected types, others have varying type patterns: We don't know...",
+				[
+					[nil, nil, nil],
+					[.uuid, nil, .number],
+					[.url, nil, nil],
+				],
+				nil
+			),
+			(
+				"Multiple rows, first has no detected types, others follow same type pattern: Header detected!",
+				[
+					[nil, nil, nil],
+					[.uuid, nil, .number],
+					[.uuid, nil, .number],
+				],
+				true
+			),
+		]
+
+		for (name, abstraction, expectedResult) in examples {
+			let result = DialectDetector.isHeaderPresent(in: abstraction)
+			XCTAssertEqual(result, expectedResult, name)
+		}
+	}
+}

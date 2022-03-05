@@ -23,6 +23,8 @@
  SOFTWARE.
  */
 
+import Foundation
+
 /// Provides the means for detecting a CSV file's dialect
 enum DialectDetector {
 	private static let fieldDelimiters: [Unicode.Scalar] = [",", ";", "\t", "|"]
@@ -245,5 +247,100 @@ extension DialectDetector {
 		}
 
 		return (abstraction, errors)
+	}
+}
+
+// MARK: -
+
+extension DialectDetector {
+	/// A representation of a CSV field's data type.
+	enum FieldType: CaseIterable {
+		case currency, date, empty, notAvailable, number, url, uuid
+
+		var check: (String) -> Bool {
+			switch self {
+			case .currency:
+				return { _ in false }
+			case .date:
+				return { NSDataDetector(type: .date).completelyMatches($0) }
+			case .empty:
+				return { $0.isEmpty }
+			case .notAvailable:
+				return { ["n/a", "na"].contains($0.lowercased()) }
+			case .number:
+				return { Double($0) != nil }
+			case .url:
+				return { NSDataDetector(type: .link).completelyMatches($0) }
+			case .uuid:
+				return { UUID(uuidString: $0) != nil }
+			}
+		}
+	}
+
+	/// Tries to detect the data type of a CSV field.
+	/// - parameter string: The field's contents.
+	/// - returns: The detected type, or `nil` if no type could be detected.
+	static func detectType(of string: String) -> FieldType? {
+		for fieldType in FieldType.allCases {
+			if fieldType.check(string) {
+				return fieldType
+			}
+		}
+
+		return nil
+	}
+
+	/// Tries to detect whether an abstract CSV representation has a header row.
+	/// - parameter abstractRows: The abstract representation of the CSV file.
+	/// - returns: `true` if we're confident that there _is_ a header row. `false` if we're confident that there is _no_ header row. `nil` if we don't know.
+	static func isHeaderPresent(in abstractRows: [[FieldType?]]) -> Bool? {
+		if abstractRows.count == 0 {
+			return false
+		}
+
+		if abstractRows[0].contains(where: isDetectedType) {
+			return false
+		}
+
+		if abstractRows.allSatisfy({ row in row.allSatisfy(isUndetectedType) }) {
+			return nil
+		}
+
+		if
+			abstractRows[0].allSatisfy(isUndetectedType),
+			abstractRows[1].contains(where: isDetectedType),
+			abstractRows[1...].allEqual()
+		{
+			return true
+		}
+
+		return nil
+	}
+}
+
+private let isUndetectedType: (DialectDetector.FieldType?) -> Bool = { $0 == nil }
+private let isDetectedType: (DialectDetector.FieldType?) -> Bool = { $0 != nil }
+
+private extension NSDataDetector {
+	convenience init(type: NSTextCheckingResult.CheckingType) {
+		try! self.init(types: type.rawValue)
+	}
+
+	/// Checks whether the entire string matches the data detector's conditions.
+	/// - Parameter string: The string to match.
+	/// - Returns: `true` if the entire string matched. Otherwise `false`.
+	func completelyMatches(_ string: String) -> Bool {
+		let matches = self.matches(in: string, range: string.nsRange)
+
+		guard matches.count == 1
+		else { return false }
+
+		return matches[0].range == string.nsRange
+	}
+}
+
+private extension String {
+	var nsRange: NSRange {
+		.init(location: 0, length: self.count)
 	}
 }

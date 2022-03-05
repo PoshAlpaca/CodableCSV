@@ -55,3 +55,40 @@ extension ReaderInferenceTests {
 		}
 	}
 }
+
+extension ReaderInferenceTests {
+	func testBenchmark() {
+		var configuration = CSVReader.Configuration()
+		configuration.delimiters = (field: nil, row: "\n")
+		let testString = _TestData.toCSV(_TestData.longContent, delimiters: (",", "\n"))
+		measure {
+			_ = try? CSVReader.decode(input: testString, configuration: configuration)
+		}
+
+	}
+
+	func testBenchmarkWithout() {
+		var configuration = CSVReader.Configuration()
+		configuration.delimiters = (field: ",", row: "\n")
+		let testString = _TestData.toCSV(_TestData.longContent, delimiters: (",", "\n"))
+		measure {
+			_ = try? CSVReader.decode(input: testString, configuration: configuration)
+		}
+	}
+}
+
+//extension ReaderInferenceTests {
+//	struct Person: Decodable, Equatable {
+//		let name: String
+//		let age: Int
+//	}
+//
+//	func testDeclarative() throws {
+//		let decoder = CSVDecoder {
+//			$0.headerStrategy = .none
+//		}
+//
+//		let alice = try decoder.decode([Person].self, from: "Alice,22")
+//		XCTAssertEqual(alice, [Person(name: "Alice", age: 22)])
+//	}
+//}

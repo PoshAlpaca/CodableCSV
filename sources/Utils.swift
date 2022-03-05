@@ -86,3 +86,11 @@ extension Sequence where Element : Hashable {
 		}
 	}
 }
+
+extension Collection where Element : Equatable {
+	/// Checks whether all elements of the collection are equal.
+	/// - returns: `true` if all elements are equal, otherwise false.
+	func allEqual() -> Bool {
+		self.allSatisfy { $0 == self.first }
+	}
+}
